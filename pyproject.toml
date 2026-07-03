@@ -1,0 +1,22 @@
+[project]
+name = "susurrate"
+version = "0.1.0"
+description = "Local, private Wispr Flow-style voice dictation for macOS"
+license = "MIT"
+readme = "README.md"
+authors = [
+    { name = "Jon Danzig", email = "jonathan.danzig@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.0",
+    "pynput>=1.8.2",
+    "sounddevice>=0.5.5",
+]
+
+[project.scripts]
+susurrate = "susurrate:main"
+
+[build-system]
+requires = ["uv_build>=0.11.13,<0.12.0"]
+build-backend = "uv_build"
