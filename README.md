@@ -49,6 +49,48 @@ punctuation fixed), pasted at your cursor, and logged to
 `~/.local/share/susurrate/history.jsonl`. Your previous clipboard is restored.
 Audio recordings are deleted as soon as they're transcribed.
 
+## Remote mode: your own dictation cloud
+
+Run the pipeline on an always-on machine (say, a Mac mini on your
+[Tailscale](https://tailscale.com) tailnet) and dictate to it from anywhere:
+
+```sh
+uv run susurrate serve    # on the always-on machine
+```
+
+The server binds to your Tailscale IP by default (falling back to
+127.0.0.1), generates a bearer token on first run, and prints both. One
+endpoint: `POST /dictate` with an audio clip as the request body — WAV, m4a,
+anything ffmpeg can read. Optional query params: `llm=1` for the Ollama
+polish pass, `paste=1` to paste the result into the *server's* frontmost app
+(off unless started with `--allow-paste`). Uploaded audio is deleted after
+transcription, same as local recordings.
+
+**From another Mac** — same hotkey experience, no models needed locally:
+
+```sh
+SUSURRATE_TOKEN=<token> uv run susurrate --remote http://100.x.y.z:8737 run
+```
+
+**From an iPhone** — no app required, just a Shortcut:
+
+1. Install Tailscale on the phone and join your tailnet.
+2. Shortcuts → new shortcut:
+   - **Record Audio** (tap to stop)
+   - **Get Contents of URL**: `http://100.x.y.z:8737/dictate?llm=1`,
+     Method POST, header `Authorization: Bearer <token>`,
+     Request Body → File → the recorded audio
+   - **Get Value for** `text` **in** Contents of URL
+   - **Copy to Clipboard** (or Show Result / Share)
+3. Add it to the Action Button or lock screen. Hold, talk, paste anywhere.
+
+Plain `curl` works too:
+
+```sh
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  --data-binary @clip.m4a "http://100.x.y.z:8737/dictate?llm=1"
+```
+
 ## How it compares
 
 **vs [Wispr Flow](https://wisprflow.ai/):** same core loop (hotkey → speak →

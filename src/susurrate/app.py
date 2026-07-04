@@ -18,8 +18,18 @@ def process(wav_path, use_llm: bool) -> tuple[str, str]:
     return raw, text
 
 
+def process_any(wav_path, args) -> tuple[str, str]:
+    """Run the pipeline locally, or on a remote `susurrate serve` (--remote)."""
+    if args.remote:
+        from . import remote
+
+        token = remote.resolve_token(args.token)
+        return remote.dictate(wav_path, args.remote, token, args.llm)
+    return process(wav_path, args.llm)
+
+
 def cmd_file(args) -> int:
-    raw, text = process(args.wav, args.llm)
+    raw, text = process_any(args.wav, args)
     if args.verbose:
         print(f"raw:   {raw}", file=sys.stderr)
     print(text)
@@ -42,7 +52,7 @@ def cmd_once(args) -> int:
         print("no audio captured", file=sys.stderr)
         return 1
     try:
-        raw, text = process(wav, args.llm)
+        raw, text = process_any(wav, args)
     finally:
         wav.unlink(missing_ok=True)
     if args.verbose:
@@ -77,8 +87,11 @@ def cmd_run(args) -> int:
 
     def _handle(wav):
         try:
-            raw, text = process(wav, args.llm)
+            raw, text = process_any(wav, args)
         except transcribe.TranscribeError as e:
+            print(f"  error: {e}", file=sys.stderr)
+            return
+        except Exception as e:  # remote errors must not kill the daemon
             print(f"  error: {e}", file=sys.stderr)
             return
         finally:
@@ -103,10 +116,19 @@ def cmd_run(args) -> int:
         return 0
 
 
+def cmd_serve(args) -> int:
+    from .server import serve
+
+    serve(args.host, args.port, args.allow_paste)
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(prog="susurrate", description="Local voice dictation (Wispr Flow-style)")
     p.add_argument("--llm", action="store_true", help="polish transcript with local Ollama LLM")
     p.add_argument("-v", "--verbose", action="store_true", help="print raw transcript to stderr")
+    p.add_argument("--remote", metavar="URL", help="send audio to a susurrate serve instance instead of transcribing locally")
+    p.add_argument("--token", help="bearer token for --remote (default: $SUSURRATE_TOKEN or the local token file)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("file", help="transcribe a WAV file")
@@ -122,7 +144,14 @@ def main() -> int:
     sp.add_argument("--key", choices=["alt_r", "alt_l", "cmd_r", "ctrl_r", "f13", "f14", "f15"])
     sp.set_defaults(func=cmd_run)
 
+    sp = sub.add_parser("serve", help="HTTP dictation server (POST /dictate)")
+    sp.add_argument("--host", help="bind address (default: Tailscale IP, else 127.0.0.1)")
+    sp.add_argument("--port", type=int, default=8737)
+    sp.add_argument("--allow-paste", action="store_true",
+                    help="let clients paste the result into this machine's frontmost app (?paste=1)")
+    sp.set_defaults(func=cmd_serve)
+
     args = p.parse_args()
-    if not DEFAULT_MODEL.exists() and args.cmd in ("file", "once", "run"):
+    if not DEFAULT_MODEL.exists() and not args.remote and args.cmd in ("file", "once", "run", "serve"):
         print(f"warning: default model missing at {DEFAULT_MODEL}", file=sys.stderr)
     return args.func(args)
