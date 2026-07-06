@@ -117,9 +117,12 @@ def cmd_run(args) -> int:
 
 
 def cmd_serve(args) -> int:
+    import shlex
+
     from .server import serve
 
-    serve(args.host, args.port, args.allow_paste)
+    agent_cmd = shlex.split(args.agent_cmd) if args.agent else None
+    serve(args.host, args.port, args.allow_paste, agent_cmd, args.agent_dir)
     return 0
 
 
@@ -149,6 +152,12 @@ def main() -> int:
     sp.add_argument("--port", type=int, default=8737)
     sp.add_argument("--allow-paste", action="store_true",
                     help="let clients paste the result into this machine's frontmost app (?paste=1)")
+    sp.add_argument("--agent", action="store_true",
+                    help="enable POST /agent: pipe transcripts into a CLI agent")
+    sp.add_argument("--agent-cmd", default="claude -p",
+                    help="agent command; the transcript is appended as the last arg (default: 'claude -p')")
+    sp.add_argument("--agent-dir", default=".",
+                    help="working directory for the agent command")
     sp.set_defaults(func=cmd_serve)
 
     args = p.parse_args()

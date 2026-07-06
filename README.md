@@ -91,6 +91,41 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
   --data-binary @clip.m4a "http://100.x.y.z:8737/dictate?llm=1"
 ```
 
+## Voice → agent: talk to your codebase
+
+Start the server with `--agent` and it grows a second endpoint, `POST /agent`:
+your speech is transcribed, cleaned, handed to a command-line agent as a
+prompt, and the agent's reply comes back.
+
+```sh
+uv run susurrate serve --agent --agent-dir ~/code            # uses `claude -p`
+uv run susurrate serve --agent --agent-cmd "ollama run llama3.2:3b"  # fully local
+```
+
+Query params: `continue=1` resumes the agent's previous conversation
+(`claude -p --continue`), and `speak=1` returns the reply as spoken audio
+(m4a via macOS `say`) instead of JSON — add a **Play Sound** action to the
+iPhone Shortcut and it's a walkie-talkie with your codebase: hold the Action
+Button, say "run the tests and tell me if they pass," hear the answer.
+
+The agent runs with whatever permissions its CLI is configured for; use
+`--agent-cmd` to pass flags (e.g. `claude -p --permission-mode acceptEdits`).
+Anyone with the bearer token can drive the agent, so treat the token
+accordingly.
+
+## Run it as a service (launchd)
+
+`contrib/com.jondanzig.susurrate.plist` is a template LaunchAgent (edit the
+paths/username). Install with:
+
+```sh
+cp contrib/com.jondanzig.susurrate.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.jondanzig.susurrate.plist
+```
+
+It starts at login, restarts on crash, and logs to
+`~/.local/share/susurrate/serve.log`.
+
 ## How it compares
 
 **vs [Wispr Flow](https://wisprflow.ai/):** same core loop (hotkey → speak →
