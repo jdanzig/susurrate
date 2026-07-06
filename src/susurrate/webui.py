@@ -43,9 +43,10 @@ PAGE = """<!DOCTYPE html>
     box-shadow: inset 0 0 0 2px #30363d;
   }
   #talk.rec { background: #da3633; box-shadow: 0 0 0 8px rgba(218,54,51,.25); }
-  #copy {
-    border: 0; border-radius: 10px; padding: 12px; font: inherit; font-weight: 600;
-    background: #21262d; color: #e6edf3;
+  #actions { display: flex; gap: 10px; }
+  #actions button {
+    flex: 1; border: 0; border-radius: 10px; padding: 12px; font: inherit;
+    font-weight: 600; background: #21262d; color: #e6edf3;
   }
 </style>
 </head>
@@ -61,7 +62,10 @@ PAGE = """<!DOCTYPE html>
   <div id="out"><span class="dim">Tap the button, speak, tap again.</span></div>
   <div id="status"></div>
   <button id="talk">talk</button>
-  <button id="copy" hidden>Copy</button>
+  <div id="actions" hidden>
+    <button id="copy">Copy</button>
+    <button id="clear">Clear</button>
+  </div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
@@ -124,7 +128,7 @@ async function send(blob) {
     if (!resp.ok) throw new Error(data.error || resp.status);
     const text = mode === "ask" ? data.reply : data.text;
     $("out").textContent = text || "(empty)";
-    $("copy").hidden = !text;
+    $("actions").hidden = !text;
     $("status").textContent = "";
     if (text && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
     if (mode === "ask" && text && "speechSynthesis" in window) {
@@ -140,6 +144,13 @@ async function send(blob) {
 $("copy").onclick = () => {
   navigator.clipboard.writeText($("out").textContent);
   $("status").textContent = "copied";
+};
+
+$("clear").onclick = () => {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  $("out").innerHTML = '<span class="dim">Tap the button, speak, tap again.</span>';
+  $("actions").hidden = true;
+  $("status").textContent = "";
 };
 </script>
 </body>
