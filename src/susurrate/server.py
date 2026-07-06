@@ -188,7 +188,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._reply(400, {"error": "empty transcript"})
             return
 
-        cmd = [*self.agent_cmd, *(["--continue"] if cont else []), text]
+        # --continue is claude-specific; other backends get the prompt as-is.
+        supports_continue = Path(self.agent_cmd[0]).name == "claude"
+        cmd = [*self.agent_cmd, *(["--continue"] if cont and supports_continue else []), text]
         print(f"  agent ← {text}")
         try:
             proc = subprocess.run(
