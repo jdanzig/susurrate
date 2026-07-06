@@ -5,20 +5,24 @@ anywhere, speak, release — cleaned-up text is inserted at your cursor.
 Everything runs on-device: whisper.cpp for speech-to-text, optional Ollama
 for AI polish. No cloud, no accounts.
 
-## Requirements
+## Setup
 
-- macOS, Homebrew
-- `brew install whisper-cpp` (provides `whisper-cli`)
-- [uv](https://docs.astral.sh/uv/)
-- optional: [Ollama](https://ollama.com) with `llama3.2:3b` for the `--llm` polish pass
-
-Download the speech model (~141 MB, one-time):
+Requirements: macOS, [Homebrew](https://brew.sh), [uv](https://docs.astral.sh/uv/).
+Optional: [Ollama](https://ollama.com) with `llama3.2:3b` for the `--llm`
+polish pass.
 
 ```sh
+brew install whisper-cpp ffmpeg     # speech-to-text + audio decoding
+git clone https://github.com/jdanzig/susurrate && cd susurrate
+uv sync
+
+# download the speech model (~141 MB, one-time)
 mkdir -p ~/.local/share/susurrate/models
 curl -L -o ~/.local/share/susurrate/models/ggml-base.en.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
 ```
+
+(ffmpeg is only needed for remote mode, to decode uploaded m4a clips.)
 
 ## macOS permissions
 
@@ -59,8 +63,9 @@ uv run susurrate serve    # on the always-on machine
 ```
 
 The server binds to your Tailscale IP by default (falling back to
-127.0.0.1), generates a bearer token on first run, and prints both. One
-endpoint: `POST /dictate` with an audio clip as the request body — WAV, m4a,
+127.0.0.1) and generates a bearer token on first run — it prints both, and
+the token lives in `~/.local/share/susurrate/token`. One endpoint:
+`POST /dictate` with an audio clip as the request body — WAV, m4a,
 anything ffmpeg can read. Optional query params: `llm=1` for the Ollama
 polish pass, `paste=1` to paste the result into the *server's* frontmost app
 (off unless started with `--allow-paste`). Uploaded audio is deleted after
@@ -82,7 +87,7 @@ HTTPS proxy in front:
    `tailscale serve`:
 
    ```sh
-   uv run susurrate serve --host 127.0.0.1
+   uv run susurrate serve --host 127.0.0.1 --agent   # --agent enables the Ask mode
    tailscale serve --bg --https=443 http://127.0.0.1:8737
    ```
 
@@ -125,10 +130,12 @@ Query params: `continue=1` resumes the agent's previous conversation
 iPhone Shortcut and it's a walkie-talkie with your codebase: hold the Action
 Button, say "run the tests and tell me if they pass," hear the answer.
 
-The agent runs with whatever permissions its CLI is configured for; use
-`--agent-cmd` to pass flags (e.g. `claude -p --permission-mode acceptEdits`).
-Anyone with the bearer token can drive the agent, so treat the token
-accordingly.
+The default backend needs the [Claude Code](https://claude.com/claude-code)
+CLI signed in **on the server machine**: run `claude login` there once and
+verify with `claude -p "say pong"`. The agent runs with whatever permissions
+its CLI is configured for; use `--agent-cmd` to pass flags (e.g.
+`claude -p --permission-mode acceptEdits`). Anyone with the bearer token can
+drive the agent, so treat the token accordingly.
 
 ## Run it as a service (launchd)
 
@@ -160,8 +167,8 @@ self-corrections ("Tuesday — no wait, Wednesday" → "Wednesday") through a
 local LLM via [Ollama](https://ollama.com). [Superwhisper](https://superwhisper.com/)
 has a similar AI layer, but it's closed-source and paid.
 
-Susurrate is deliberately small: ~400 lines of Python you can read in ten
-minutes, meant as a hackable base for experimenting with the
+Susurrate is deliberately small: under 1000 lines of Python across eight
+modules, meant as a hackable base for experimenting with the
 transcript→clean-text stage (prompts, models, rules).
 
 ## Development
