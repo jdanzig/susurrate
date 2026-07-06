@@ -5,6 +5,15 @@ anywhere, speak, release — cleaned-up text is inserted at your cursor.
 Everything runs on-device: whisper.cpp for speech-to-text, optional Ollama
 for AI polish. No cloud, no accounts.
 
+<p align="center">
+  <img src="docs/dictate.png" width="330" alt="Dictate mode: spoken 'um, can you send over the quarterly numbers before Thursday — no wait, before Wednesday — and, uh, loop in Sarah as well' came out as clean text with the correction applied">
+  <img src="docs/ask.png" width="330" alt="Ask mode: a spoken question answered by Claude Code running on the server">
+</p>
+
+<p align="center"><sub>The phone web app, real output: <b>Dictate</b> stripped the
+"um"s and applied a mid-sentence correction ("before Thursday — no wait, before
+Wednesday"); <b>Ask</b> is Claude Code on the server answering a spoken question.</sub></p>
+
 ## Setup
 
 Requirements: macOS, [Homebrew](https://brew.sh), [uv](https://docs.astral.sh/uv/).
