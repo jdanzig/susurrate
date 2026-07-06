@@ -17,6 +17,7 @@ import secrets
 import shutil
 import subprocess
 import tempfile
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -25,6 +26,7 @@ from . import history, inject
 from .transcribe import TranscribeError
 
 TOKEN_PATH = Path.home() / ".local/share/susurrate/token"
+AGENT_SESSION_PATH = Path.home() / ".local/share/susurrate/agent-session"
 MAX_BODY = 50 * 1024 * 1024  # 50 MB of audio is minutes of speech
 
 
@@ -37,6 +39,47 @@ def load_token() -> str:
     TOKEN_PATH.write_text(token + "\n")
     TOKEN_PATH.chmod(0o600)
     return token
+
+
+def agent_session_id(reset: bool = False) -> str:
+    """The phone agent's dedicated Claude session UUID, stable across restarts.
+
+    A fixed, private session so Ask follow-ups continue *each other* — never
+    `claude --continue`, which would latch onto whatever interactive
+    conversation happens to be newest in the working directory. reset=True
+    rotates it, starting a fresh thread.
+    """
+    if reset:
+        AGENT_SESSION_PATH.unlink(missing_ok=True)
+    if AGENT_SESSION_PATH.exists():
+        return AGENT_SESSION_PATH.read_text().strip()
+    sid = str(uuid.uuid4())
+    AGENT_SESSION_PATH.parent.mkdir(parents=True, exist_ok=True)
+    AGENT_SESSION_PATH.write_text(sid + "\n")
+    return sid
+
+
+def _run_claude_session(base_cmd, sid, text, cwd, env, timeout):
+    """Run claude in a dedicated session: resume it, else create it.
+
+    --resume fails on a session that doesn't exist yet; --session-id fails on
+    one that does. Try resume first (the steady state), fall back to create,
+    and handle the create/create race between two concurrent first requests.
+    """
+    def run(args):
+        return subprocess.run(
+            [*base_cmd, *args, text], cwd=cwd, env=env,
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout,
+        )
+
+    proc = run(["--resume", sid])
+    if proc.returncode == 0:
+        return proc
+    if "No conversation found" in (proc.stderr + proc.stdout):
+        proc = run(["--session-id", sid])
+        if proc.returncode != 0 and "already in use" in (proc.stderr + proc.stdout):
+            proc = run(["--resume", sid])  # lost the create race; resume instead
+    return proc
 
 
 def tailscale_ip() -> str | None:
@@ -159,7 +202,7 @@ class _Handler(BaseHTTPRequestHandler):
         if url.path == "/dictate":
             self._dictate(flag("llm"), flag("paste"))
         elif url.path == "/agent":
-            self._agent(flag("llm"), flag("continue"), flag("speak"))
+            self._agent(flag("llm"), flag("continue"), flag("speak"), flag("reset"))
         else:
             self._reply(404, {"error": "unknown path"})
 
@@ -176,7 +219,7 @@ class _Handler(BaseHTTPRequestHandler):
             history.append(raw, text)
         self._reply(200, {"text": text, "raw": raw, "pasted": pasted})
 
-    def _agent(self, use_llm: bool, cont: bool, speak: bool) -> None:
+    def _agent(self, use_llm: bool, cont: bool, speak: bool, reset: bool) -> None:
         if self.agent_cmd is None:
             self._reply(403, {"error": "agent endpoint disabled (start with --agent)"})
             return
@@ -188,16 +231,22 @@ class _Handler(BaseHTTPRequestHandler):
             self._reply(400, {"error": "empty transcript"})
             return
 
-        # --continue is claude-specific; other backends get the prompt as-is.
-        supports_continue = Path(self.agent_cmd[0]).name == "claude"
-        cmd = [*self.agent_cmd, *(["--continue"] if cont and supports_continue else []), text]
+        # Session continuity is claude-specific and always via a dedicated,
+        # isolated session — never `--continue` (which would hijack whatever
+        # interactive conversation is newest in the working directory).
+        is_claude = Path(self.agent_cmd[0]).name == "claude"
         print(f"  agent ← {text}")
         try:
-            proc = subprocess.run(
-                cmd, cwd=self.agent_dir, env=_agent_env(),
-                stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                timeout=600,
-            )
+            if cont and is_claude:
+                sid = agent_session_id(reset=reset)
+                proc = _run_claude_session(
+                    self.agent_cmd, sid, text, self.agent_dir, _agent_env(), 600
+                )
+            else:
+                proc = subprocess.run(
+                    [*self.agent_cmd, text], cwd=self.agent_dir, env=_agent_env(),
+                    stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=600,
+                )
         except subprocess.TimeoutExpired:
             self._reply(504, {"error": "agent timed out after 600s"})
             return

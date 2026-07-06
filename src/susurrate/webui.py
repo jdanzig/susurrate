@@ -69,7 +69,7 @@ PAGE = """<!DOCTYPE html>
 </main>
 <script>
 const $ = id => document.getElementById(id);
-let mode = "dictate", rec = null, chunks = [], busy = false;
+let mode = "dictate", rec = null, chunks = [], busy = false, resetNext = false;
 
 function token(force) {
   let t = localStorage.token;
@@ -116,7 +116,8 @@ $("talk").onclick = async () => {
 async function send(blob) {
   busy = true;
   $("status").textContent = mode === "ask" ? "thinking\\u2026" : "transcribing\\u2026";
-  const url = mode === "ask" ? "/agent?llm=0&continue=1" : "/dictate?llm=1";
+  let url = mode === "ask" ? "/agent?llm=0&continue=1" : "/dictate?llm=1";
+  if (mode === "ask" && resetNext) { url += "&reset=1"; resetNext = false; }
   try {
     const resp = await fetch(url, {
       method: "POST",
@@ -151,6 +152,7 @@ $("clear").onclick = () => {
   $("out").innerHTML = '<span class="dim">Tap the button, speak, tap again.</span>';
   $("actions").hidden = true;
   $("status").textContent = "";
+  resetNext = true;  // next Ask starts a fresh agent conversation
 };
 </script>
 </body>

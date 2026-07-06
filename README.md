@@ -156,11 +156,19 @@ uv run susurrate serve --agent --agent-dir ~/code            # uses `claude -p`
 uv run susurrate serve --agent --agent-cmd "ollama run llama3.2:3b"  # fully local
 ```
 
-Query params: `continue=1` resumes the agent's previous conversation
-(`claude -p --continue`), and `speak=1` returns the reply as spoken audio
-(m4a via macOS `say`) instead of JSON — add a **Play Sound** action to the
-iPhone Shortcut and it's a walkie-talkie with your codebase: hold the Action
-Button, say "run the tests and tell me if they pass," hear the answer.
+Query params: `continue=1` keeps a running conversation so follow-ups have
+context; `reset=1` starts that conversation fresh; `speak=1` returns the reply
+as spoken audio (m4a via macOS `say`) instead of JSON — add a **Play Sound**
+action to the iPhone Shortcut and it's a walkie-talkie with your codebase:
+hold the Action Button, say "run the tests and tell me if they pass," hear
+the answer.
+
+Continuity uses a **dedicated, private Claude session** (a fixed UUID stored
+at `~/.local/share/susurrate/agent-session`) — deliberately *not*
+`claude --continue`, which resumes whichever conversation is newest in the
+working directory and would let a phone request hijack an interactive Claude
+session you have open there. The phone thread stays isolated from your other
+work; delete that file (or send `reset=1`) to start over.
 
 The default backend needs the [Claude Code](https://claude.com/claude-code)
 CLI signed in **on the server machine**: run `claude login` there once and
