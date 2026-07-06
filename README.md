@@ -12,7 +12,30 @@ for AI polish. No cloud, no accounts.
 
 <p align="center"><sub>The phone web app, real output: <b>Dictate</b> stripped the
 "um"s and applied a mid-sentence correction ("before Thursday — no wait, before
-Wednesday"); <b>Ask</b> is Claude Code on the server answering a spoken question.</sub></p>
+Wednesday"); <b>Ask</b> is Claude Code running <i>on your own machine</i>, with
+your files and toolchain, answering a spoken question.</sub></p>
+
+## "Why not just use the Claude app on my phone?"
+
+Fair question — the Ask screenshot looks like a chatbot. The difference is
+where the words go and where they run:
+
+- **Dictation lands anywhere, not in a chat.** The core loop types clean text
+  into your email, Slack, a code comment, any field on any of your machines —
+  it's a keyboard replacement. A voice-assistant app leaves the text stranded
+  in its own conversation; getting it into your draft means copy-paste.
+- **Your voice never leaves hardware you own.** Speech is transcribed on your
+  Mac by whisper.cpp. Nothing is uploaded to anyone's servers, no account, no
+  logging you don't control.
+- **Ask reaches _your_ machine, not a cloud sandbox.** "Run my tests," "what
+  changed in this repo," "restart the service" only mean something to an agent
+  standing on the box with your files, your toolchain, your always-on Mac mini.
+  A phone assistant has no hands on your computer.
+- **It's plumbing, not a product.** A token-guarded HTTP endpoint any script,
+  hotkey, cron job, or Shortcut can call — compose it however you like.
+
+Rule of thumb: voice _chat_ → use the Claude app. Voice _typing_ everywhere,
+and voice _commands to the machine you own_ → that's this.
 
 ## Setup
 
