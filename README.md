@@ -72,23 +72,40 @@ transcription, same as local recordings.
 SUSURRATE_TOKEN=<token> uv run susurrate --remote http://100.x.y.z:8737 run
 ```
 
-**From an iPhone** — no app required, just a Shortcut:
+**From a phone** — susurrate serves its own one-button web app at `GET /`.
+Phones only allow microphone access over HTTPS, so put Tailscale's built-in
+HTTPS proxy in front:
 
-1. Install Tailscale on the phone and join your tailnet.
-2. Shortcuts → new shortcut:
-   - **Record Audio** (tap to stop)
-   - **Get Contents of URL**: `http://100.x.y.z:8737/dictate?llm=1`,
-     Method POST, header `Authorization: Bearer <token>`,
-     Request Body → File → the recorded audio
-   - **Get Value for** `text` **in** Contents of URL
-   - **Copy to Clipboard** (or Show Result / Share)
-3. Add it to the Action Button or lock screen. Hold, talk, paste anywhere.
+1. In the [Tailscale admin console](https://login.tailscale.com/admin/dns),
+   enable **HTTPS Certificates** (one-time, whole tailnet).
+2. On the server machine, bind susurrate to localhost and front it with
+   `tailscale serve`:
+
+   ```sh
+   uv run susurrate serve --host 127.0.0.1
+   tailscale serve --bg --https=443 http://127.0.0.1:8737
+   ```
+
+3. On the phone (Tailscale connected): open
+   `https://<machine>.<tailnet>.ts.net` in the browser, paste the token when
+   asked (remembered from then on), allow the microphone, and use
+   **Share → Add to Home Screen** to make it a full-screen app.
+
+Tap, talk, tap: the cleaned text appears and is copied to the clipboard.
+The **Ask** toggle sends your words to the agent instead (see below) and
+reads the reply aloud. The first HTTPS request takes ~15 s while the
+certificate is issued; after that it's instant.
+
+Prefer no web app? An Apple Shortcut works too: **Record Audio** →
+**Get Contents of URL** (POST to `/dictate?llm=1`, header
+`Authorization: Bearer <token>`, Request Body → File → Recorded Audio) →
+**Get Value for** `text` → **Copy to Clipboard**.
 
 Plain `curl` works too:
 
 ```sh
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-  --data-binary @clip.m4a "http://100.x.y.z:8737/dictate?llm=1"
+  --data-binary @clip.m4a "https://<machine>.<tailnet>.ts.net/dictate?llm=1"
 ```
 
 ## Voice → agent: talk to your codebase
