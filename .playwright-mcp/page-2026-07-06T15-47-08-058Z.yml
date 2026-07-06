@@ -1,0 +1,9 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "susurrate" [level=1] [ref=e3]
+    - generic [ref=e4]:
+      - button "Dictate" [ref=e5]
+      - button "Ask" [ref=e6]
+  - main [ref=e7]:
+    - generic [ref=e8]: Tap the button, speak, tap again.
+    - button "talk" [ref=e10]

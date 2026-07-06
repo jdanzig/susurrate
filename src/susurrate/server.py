@@ -135,6 +135,19 @@ class _Handler(BaseHTTPRequestHandler):
             if wav is not None:
                 wav.unlink(missing_ok=True)
 
+    def do_GET(self) -> None:  # noqa: N802 (http.server API)
+        if urlparse(self.path).path != "/":
+            self._reply(404, {"error": "unknown path"})
+            return
+        from .webui import PAGE
+
+        body = PAGE.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_POST(self) -> None:  # noqa: N802 (http.server API)
         url = urlparse(self.path)
         if self.headers.get("Authorization") != f"Bearer {self.token}":
