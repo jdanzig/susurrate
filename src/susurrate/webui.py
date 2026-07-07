@@ -36,6 +36,11 @@ PAGE = """<!DOCTYPE html>
     white-space: pre-wrap; overflow-y: auto; font-size: 16px; min-height: 120px;
   }
   #out .dim { color: #8b949e; }
+  .wait { height: 100%; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 12px; color: #8b949e; }
+  .spinner { width: 26px; height: 26px; border: 3px solid #30363d;
+    border-top-color: #238636; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   #status { text-align: center; color: #8b949e; font-size: 14px; min-height: 20px; }
   #talk {
     border: 0; border-radius: 50%; width: 132px; height: 132px; align-self: center;
@@ -72,6 +77,29 @@ PAGE = """<!DOCTYPE html>
 const $ = id => document.getElementById(id);
 let mode = "dictate", rec = null, chunks = [], busy = false, resetNext = false;
 let shownText = "";  // the transcript we displayed, to diff against your edits
+let waitTimer = null;
+
+function startWait(label) {
+  stopWait();
+  $("actions").hidden = true;
+  $("save").hidden = true;
+  $("status").textContent = "";
+  $("out").contentEditable = "false";
+  $("out").innerHTML = '<div class="wait"><div class="spinner"></div>' +
+    '<div id="waitmsg"></div></div>';
+  const t0 = Date.now();
+  const tick = () => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    const el = $("waitmsg");
+    if (el) el.textContent = label + " \\u00b7 " + s + "s";
+  };
+  tick();
+  waitTimer = setInterval(tick, 1000);
+}
+
+function stopWait() {
+  if (waitTimer) { clearInterval(waitTimer); waitTimer = null; }
+}
 
 function token(force) {
   let t = localStorage.token;
@@ -117,7 +145,7 @@ $("talk").onclick = async () => {
 
 async function send(blob) {
   busy = true;
-  $("status").textContent = mode === "ask" ? "thinking\\u2026" : "transcribing\\u2026";
+  startWait(mode === "ask" ? "Thinking" : "Transcribing");
   let url = mode === "ask" ? "/agent?llm=0&continue=1" : "/dictate?llm=1";
   if (mode === "ask" && resetNext) { url += "&reset=1"; resetNext = false; }
   try {
@@ -126,9 +154,10 @@ async function send(blob) {
       headers: { Authorization: "Bearer " + token() },
       body: blob,
     });
-    if (resp.status === 401) { token(true); busy = false; $("status").textContent = "token updated \\u2014 try again"; return; }
+    if (resp.status === 401) { token(true); busy = false; stopWait(); $("out").textContent = ""; $("status").textContent = "token updated \\u2014 try again"; return; }
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || resp.status);
+    stopWait();
     const text = mode === "ask" ? data.reply : data.text;
     $("out").textContent = text || "(empty)";
     $("actions").hidden = !text;
@@ -144,6 +173,8 @@ async function send(blob) {
       speechSynthesis.speak(new SpeechSynthesisUtterance(text));
     }
   } catch (e) {
+    stopWait();
+    $("out").innerHTML = '<span class="dim">Tap the button, speak, tap again.</span>';
     $("status").textContent = "error: " + e.message;
   }
   busy = false;
