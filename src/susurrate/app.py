@@ -5,14 +5,15 @@ import sys
 import threading
 import time
 
-from . import fmt, history, inject, transcribe
+from . import dictionary, fmt, history, inject, transcribe
 from .transcribe import DEFAULT_MODEL
 
 
 def process(wav_path, use_llm: bool) -> tuple[str, str]:
     """WAV -> (raw transcript, cleaned text)."""
-    raw = transcribe.transcribe(wav_path)
-    text = fmt.clean(raw)
+    corrections = dictionary.load()
+    raw = transcribe.transcribe(wav_path, initial_prompt=dictionary.prompt(corrections))
+    text = dictionary.apply(fmt.clean(raw), corrections)
     if use_llm and text:
         text = fmt.polish(text)
     return raw, text

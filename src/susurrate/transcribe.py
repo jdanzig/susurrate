@@ -11,8 +11,13 @@ class TranscribeError(RuntimeError):
     pass
 
 
-def transcribe(wav_path: str | Path, model: str | Path = DEFAULT_MODEL) -> str:
-    """Transcribe a 16 kHz mono WAV file, returning plain text."""
+def transcribe(wav_path: str | Path, model: str | Path = DEFAULT_MODEL,
+               initial_prompt: str = "") -> str:
+    """Transcribe a 16 kHz mono WAV file, returning plain text.
+
+    initial_prompt biases recognition toward your vocabulary (proper nouns,
+    jargon) — see the personal dictionary.
+    """
     if shutil.which("whisper-cli") is None:
         raise TranscribeError("whisper-cli not found (brew install whisper-cpp)")
     model = Path(model)
@@ -26,6 +31,7 @@ def transcribe(wav_path: str | Path, model: str | Path = DEFAULT_MODEL) -> str:
             "-f", str(wav_path),
             "--no-timestamps",
             "--no-prints",
+            *(["--prompt", initial_prompt] if initial_prompt else []),
         ],
         capture_output=True,
         text=True,

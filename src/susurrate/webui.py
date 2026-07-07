@@ -64,12 +64,14 @@ PAGE = """<!DOCTYPE html>
   <button id="talk">talk</button>
   <div id="actions" hidden>
     <button id="copy">Copy</button>
+    <button id="save" hidden>Save fixes</button>
     <button id="clear">Clear</button>
   </div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
 let mode = "dictate", rec = null, chunks = [], busy = false, resetNext = false;
+let shownText = "";  // the transcript we displayed, to diff against your edits
 
 function token(force) {
   let t = localStorage.token;
@@ -131,6 +133,11 @@ async function send(blob) {
     $("out").textContent = text || "(empty)";
     $("actions").hidden = !text;
     $("status").textContent = "";
+    // Dictate output is editable so you can fix a word and teach it (Save).
+    const editable = mode === "dictate" && !!text;
+    shownText = editable ? text : "";
+    $("out").contentEditable = editable ? "plaintext-only" : "false";
+    $("save").hidden = !editable;
     if (text && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
     if (mode === "ask" && text && "speechSynthesis" in window) {
       speechSynthesis.cancel();
@@ -147,11 +154,35 @@ $("copy").onclick = () => {
   $("status").textContent = "copied";
 };
 
+$("save").onclick = async () => {
+  const edited = $("out").textContent.trim();
+  navigator.clipboard.writeText(edited).catch(() => {});
+  if (edited === shownText) { $("status").textContent = "no changes"; return; }
+  try {
+    const resp = await fetch("/learn", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token(), "Content-Type": "application/json" },
+      body: JSON.stringify({ original: shownText, edited }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || resp.status);
+    const pairs = Object.entries(data.learned);
+    $("status").textContent = pairs.length
+      ? "learned " + pairs.map(([w, r]) => w + "\\u2192" + r).join(", ")
+      : "saved (nothing new to learn)";
+    shownText = edited;
+  } catch (e) {
+    $("status").textContent = "error: " + e.message;
+  }
+};
+
 $("clear").onclick = () => {
   if ("speechSynthesis" in window) speechSynthesis.cancel();
+  $("out").contentEditable = "false";
   $("out").innerHTML = '<span class="dim">Tap the button, speak, tap again.</span>';
   $("actions").hidden = true;
   $("status").textContent = "";
+  shownText = "";
   resetNext = true;  // next Ask starts a fresh agent conversation
 };
 </script>

@@ -203,8 +203,27 @@ class _Handler(BaseHTTPRequestHandler):
             self._dictate(flag("llm"), flag("paste"))
         elif url.path == "/agent":
             self._agent(flag("llm"), flag("continue"), flag("speak"), flag("reset"))
+        elif url.path == "/learn":
+            self._learn()
         else:
             self._reply(404, {"error": "unknown path"})
+
+    def _learn(self) -> None:
+        """Teach the personal dictionary from an edited transcript."""
+        from . import dictionary
+
+        length = int(self.headers.get("Content-Length") or 0)
+        if not 0 < length <= 100_000:
+            self._reply(400, {"error": "expected a small JSON body"})
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+            original, edited = body["original"], body["edited"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            self._reply(400, {"error": "body must be {original, edited}"})
+            return
+        learned = dictionary.learn(original, edited)
+        self._reply(200, {"learned": learned, "size": len(dictionary.load())})
 
     def _dictate(self, use_llm: bool, want_paste: bool) -> None:
         result = self._transcribe_body(use_llm)

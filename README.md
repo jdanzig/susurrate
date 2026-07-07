@@ -133,6 +133,17 @@ The **Ask** toggle sends your words to the agent instead (see below) and
 reads the reply aloud. The first HTTPS request takes ~15 s while the
 certificate is issued; after that it's instant.
 
+### Teach it your words
+
+Whisper mishears names and jargon — "susurrate" comes out "Sesarite". In the
+web app's **Dictate** mode the result is editable: fix the word, tap **Save
+fixes**, and the correction is stored and applied to every future dictation
+(both as a whisper hint and a substitution). It only learns genuine
+transcription fixes — editing a real word to another real word (changing your
+mind) is ignored, so the dictionary doesn't fill with noise. Corrections live
+in `~/.local/share/susurrate/dictionary.json`; edit or delete it directly any
+time.
+
 Prefer no web app? An Apple Shortcut works too: **Record Audio** →
 **Get Contents of URL** (POST to `/dictate?llm=1`, header
 `Authorization: Bearer <token>`, Request Body → File → Recorded Audio) →
@@ -194,8 +205,8 @@ It starts at login, restarts on crash, and logs to
 
 **vs [Wispr Flow](https://wisprflow.ai/):** same core loop (hotkey → speak →
 polished text at cursor), but 100% local and free. Not (yet) included:
-command mode, per-app tone, personal dictionary, menu-bar UI, streaming
-transcription. See [PLAN.md](PLAN.md).
+command mode, per-app tone, menu-bar UI, streaming transcription. See
+[PLAN.md](PLAN.md).
 
 **vs [OpenSuperWhisper](https://github.com/starmel/OpenSuperWhisper):** if you
 want a polished native dictation app, use that — it has a real UI, in-app
