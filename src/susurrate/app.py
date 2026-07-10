@@ -24,8 +24,13 @@ def process_any(wav_path, args) -> tuple[str, str]:
     if args.remote:
         from . import remote
 
-        token = remote.resolve_token(args.token)
-        return remote.dictate(wav_path, args.remote, token, args.llm)
+        try:
+            token = remote.resolve_token(args.token)
+            return remote.dictate(wav_path, args.remote, token, args.llm)
+        except remote.RemoteError as e:
+            if not DEFAULT_MODEL.exists():
+                raise
+            print(f"  remote unreachable ({e}) — falling back to local", file=sys.stderr)
     return process(wav_path, args.llm)
 
 
