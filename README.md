@@ -6,36 +6,22 @@ Everything runs on-device: whisper.cpp for speech-to-text, optional Ollama
 for AI polish. No cloud, no accounts.
 
 <p align="center">
-  <img src="docs/dictate.png" width="330" alt="Dictate mode: spoken 'um, can you send over the quarterly numbers before Thursday — no wait, before Wednesday — and, uh, loop in Sarah as well' came out as clean text with the correction applied">
-  <img src="docs/ask.png" width="330" alt="Ask mode: a spoken question answered by Claude Code running on the server">
+  <img src="docs/dictate.png" width="330" alt="The phone web app: spoken 'um, can you send over the quarterly numbers before Thursday — no wait, before Wednesday — and, uh, loop in Sarah as well' came out as clean text with the correction applied">
 </p>
 
-<p align="center"><sub>The phone web app, real output: <b>Dictate</b> stripped the
-"um"s and applied a mid-sentence correction ("before Thursday — no wait, before
-Wednesday"); <b>Ask</b> is Claude Code running <i>on your own machine</i>, with
-your files and toolchain, answering a spoken question.</sub></p>
+<p align="center"><sub>The phone web app, real output: the "um"s stripped and a
+mid-sentence correction applied ("before Thursday — no wait, before Wednesday").</sub></p>
 
-## "Why not just use the Claude app on my phone?"
+## Why not just use the built-in dictation?
 
-Fair question — the Ask screenshot looks like a chatbot. The difference is
-where the words go and where they run:
-
-- **Dictation lands anywhere, not in a chat.** The core loop types clean text
-  into your email, Slack, a code comment, any field on any of your machines —
-  it's a keyboard replacement. A voice-assistant app leaves the text stranded
-  in its own conversation; getting it into your draft means copy-paste.
+- **The polish.** Built-in dictation gives you the messy first pass, filler
+  words and all. susurrate strips the "um"s, fixes punctuation, and applies
+  spoken self-corrections — text you can send without editing.
 - **Your voice never leaves hardware you own.** Speech is transcribed on your
-  Mac by whisper.cpp. Nothing is uploaded to anyone's servers, no account, no
-  logging you don't control.
-- **Ask reaches _your_ machine, not a cloud sandbox.** "Run my tests," "what
-  changed in this repo," "restart the service" only mean something to an agent
-  standing on the box with your files, your toolchain, your always-on Mac mini.
-  A phone assistant has no hands on your computer.
-- **It's plumbing, not a product.** A token-guarded HTTP endpoint any script,
-  hotkey, cron job, or Shortcut can call — compose it however you like.
-
-Rule of thumb: voice _chat_ → use the Claude app. Voice _typing_ everywhere,
-and voice _commands to the machine you own_ → that's this.
+  Mac by whisper.cpp. Nothing uploaded, no account, no logging you don't control.
+  (Wispr Flow, the paid tool this clones, sends your audio to its servers.)
+- **It's yours.** A token-guarded HTTP endpoint any script, hotkey, or Shortcut
+  can call, plus a personal dictionary you teach. Free, ~1000 lines of Python.
 
 ## Setup
 
@@ -119,7 +105,7 @@ HTTPS proxy in front:
    `tailscale serve`:
 
    ```sh
-   uv run susurrate serve --host 127.0.0.1 --agent   # --agent enables the Ask mode
+   uv run susurrate serve --host 127.0.0.1
    tailscale serve --bg --https=443 http://127.0.0.1:8737
    ```
 
@@ -128,10 +114,9 @@ HTTPS proxy in front:
    asked (remembered from then on), allow the microphone, and use
    **Share → Add to Home Screen** to make it a full-screen app.
 
-Tap, talk, tap: the cleaned text appears and is copied to the clipboard.
-The **Ask** toggle sends your words to the agent instead (see below) and
-reads the reply aloud. The first HTTPS request takes ~15 s while the
-certificate is issued; after that it's instant.
+Tap, talk, tap: the cleaned text appears and is copied to the clipboard,
+ready to paste. The first HTTPS request takes ~15 s while the certificate is
+issued; after that it's instant.
 
 ### Teach it your words
 
@@ -155,38 +140,6 @@ Plain `curl` works too:
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   --data-binary @clip.m4a "https://<machine>.<tailnet>.ts.net/dictate?llm=1"
 ```
-
-## Voice → agent: talk to your codebase
-
-Start the server with `--agent` and it grows a second endpoint, `POST /agent`:
-your speech is transcribed, cleaned, handed to a command-line agent as a
-prompt, and the agent's reply comes back.
-
-```sh
-uv run susurrate serve --agent --agent-dir ~/code            # uses `claude -p`
-uv run susurrate serve --agent --agent-cmd "ollama run llama3.2:3b"  # fully local
-```
-
-Query params: `continue=1` keeps a running conversation so follow-ups have
-context; `reset=1` starts that conversation fresh; `speak=1` returns the reply
-as spoken audio (m4a via macOS `say`) instead of JSON — add a **Play Sound**
-action to the iPhone Shortcut and it's a walkie-talkie with your codebase:
-hold the Action Button, say "run the tests and tell me if they pass," hear
-the answer.
-
-Continuity uses a **dedicated, private Claude session** (a fixed UUID stored
-at `~/.local/share/susurrate/agent-session`) — deliberately *not*
-`claude --continue`, which resumes whichever conversation is newest in the
-working directory and would let a phone request hijack an interactive Claude
-session you have open there. The phone thread stays isolated from your other
-work; delete that file (or send `reset=1`) to start over.
-
-The default backend needs the [Claude Code](https://claude.com/claude-code)
-CLI signed in **on the server machine**: run `claude login` there once and
-verify with `claude -p "say pong"`. The agent runs with whatever permissions
-its CLI is configured for; use `--agent-cmd` to pass flags (e.g.
-`claude -p --permission-mode acceptEdits`). Anyone with the bearer token can
-drive the agent, so treat the token accordingly.
 
 ## Run it as a service (launchd)
 

@@ -22,14 +22,8 @@ PAGE = """<!DOCTYPE html>
     min-height: 100dvh; display: flex; flex-direction: column;
     padding: max(env(safe-area-inset-top), 16px) 20px max(env(safe-area-inset-bottom), 16px);
   }
-  header { display: flex; justify-content: space-between; align-items: center; }
+  header { display: flex; align-items: center; }
   h1 { font-size: 20px; font-weight: 650; letter-spacing: .3px; }
-  .mode { display: flex; gap: 4px; background: #161b22; border-radius: 10px; padding: 4px; }
-  .mode button {
-    border: 0; background: transparent; color: #8b949e; font: inherit;
-    font-size: 14px; padding: 6px 14px; border-radius: 7px;
-  }
-  .mode button.on { background: #238636; color: #fff; }
   main { flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 18px; }
   #out {
     flex: 1; background: #161b22; border-radius: 14px; padding: 14px;
@@ -56,33 +50,26 @@ PAGE = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<header>
-  <h1>susurrate</h1>
-  <div class="mode">
-    <button id="m-dictate" class="on">Dictate</button>
-    <button id="m-ask">Ask</button>
-  </div>
-</header>
+<header><h1>susurrate</h1></header>
 <main>
   <div id="out"><span class="dim">Tap the button, speak, tap again.</span></div>
   <div id="status"></div>
   <button id="talk">talk</button>
   <div id="actions" hidden>
     <button id="copy">Copy</button>
-    <button id="save" hidden>Save fixes</button>
+    <button id="save">Save fixes</button>
     <button id="clear">Clear</button>
   </div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
-let mode = "dictate", rec = null, chunks = [], busy = false, resetNext = false;
+let rec = null, chunks = [], busy = false;
 let shownText = "";  // the transcript we displayed, to diff against your edits
 let waitTimer = null;
 
-function startWait(label) {
+function startWait() {
   stopWait();
   $("actions").hidden = true;
-  $("save").hidden = true;
   $("status").textContent = "";
   $("out").contentEditable = "false";
   $("out").innerHTML = '<div class="wait"><div class="spinner"></div>' +
@@ -91,7 +78,7 @@ function startWait(label) {
   const tick = () => {
     const s = Math.round((Date.now() - t0) / 1000);
     const el = $("waitmsg");
-    if (el) el.textContent = label + " \\u00b7 " + s + "s";
+    if (el) el.textContent = "Transcribing \\u00b7 " + s + "s";
   };
   tick();
   waitTimer = setInterval(tick, 1000);
@@ -109,14 +96,6 @@ function token(force) {
   }
   return localStorage.token;
 }
-
-function setMode(m) {
-  mode = m;
-  $("m-dictate").classList.toggle("on", m === "dictate");
-  $("m-ask").classList.toggle("on", m === "ask");
-}
-$("m-dictate").onclick = () => setMode("dictate");
-$("m-ask").onclick = () => setMode("ask");
 
 $("talk").onclick = async () => {
   if (busy) return;
@@ -145,11 +124,9 @@ $("talk").onclick = async () => {
 
 async function send(blob) {
   busy = true;
-  startWait(mode === "ask" ? "Thinking" : "Transcribing");
-  let url = mode === "ask" ? "/agent?llm=0&continue=1" : "/dictate?llm=1";
-  if (mode === "ask" && resetNext) { url += "&reset=1"; resetNext = false; }
+  startWait();
   try {
-    const resp = await fetch(url, {
+    const resp = await fetch("/dictate?llm=1", {
       method: "POST",
       headers: { Authorization: "Bearer " + token() },
       body: blob,
@@ -158,20 +135,14 @@ async function send(blob) {
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || resp.status);
     stopWait();
-    const text = mode === "ask" ? data.reply : data.text;
+    const text = data.text;
     $("out").textContent = text || "(empty)";
     $("actions").hidden = !text;
     $("status").textContent = "";
-    // Dictate output is editable so you can fix a word and teach it (Save).
-    const editable = mode === "dictate" && !!text;
-    shownText = editable ? text : "";
-    $("out").contentEditable = editable ? "plaintext-only" : "false";
-    $("save").hidden = !editable;
+    // Output is editable so you can fix a word and teach it (Save fixes).
+    shownText = text || "";
+    $("out").contentEditable = text ? "plaintext-only" : "false";
     if (text && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
-    if (mode === "ask" && text && "speechSynthesis" in window) {
-      speechSynthesis.cancel();
-      speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-    }
   } catch (e) {
     stopWait();
     $("out").innerHTML = '<span class="dim">Tap the button, speak, tap again.</span>';
@@ -208,13 +179,11 @@ $("save").onclick = async () => {
 };
 
 $("clear").onclick = () => {
-  if ("speechSynthesis" in window) speechSynthesis.cancel();
   $("out").contentEditable = "false";
   $("out").innerHTML = '<span class="dim">Tap the button, speak, tap again.</span>';
   $("actions").hidden = true;
   $("status").textContent = "";
   shownText = "";
-  resetNext = true;  // next Ask starts a fresh agent conversation
 };
 </script>
 </body>

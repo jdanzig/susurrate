@@ -5,19 +5,15 @@ bearer token; get back JSON with the raw transcript and cleaned text.
 Query params: llm=1 (Ollama polish), paste=1 (also paste into this
 machine's frontmost app — only honored when the server allows it).
 
-POST /agent (opt-in via --agent) pipes the cleaned transcript into a
-command-line agent (default `claude -p`) and returns its reply. Query
-params: llm=1, continue=1 (pass --continue to the agent), speak=1
-(return the reply as spoken audio instead of JSON).
+POST /learn teaches the personal dictionary from an edited transcript.
+GET / serves the phone web app.
 """
 
 import json
-import os
 import secrets
 import shutil
 import subprocess
 import tempfile
-import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -26,7 +22,6 @@ from . import history, inject
 from .transcribe import TranscribeError
 
 TOKEN_PATH = Path.home() / ".local/share/susurrate/token"
-AGENT_SESSION_PATH = Path.home() / ".local/share/susurrate/agent-session"
 MAX_BODY = 50 * 1024 * 1024  # 50 MB of audio is minutes of speech
 
 
@@ -39,47 +34,6 @@ def load_token() -> str:
     TOKEN_PATH.write_text(token + "\n")
     TOKEN_PATH.chmod(0o600)
     return token
-
-
-def agent_session_id(reset: bool = False) -> str:
-    """The phone agent's dedicated Claude session UUID, stable across restarts.
-
-    A fixed, private session so Ask follow-ups continue *each other* — never
-    `claude --continue`, which would latch onto whatever interactive
-    conversation happens to be newest in the working directory. reset=True
-    rotates it, starting a fresh thread.
-    """
-    if reset:
-        AGENT_SESSION_PATH.unlink(missing_ok=True)
-    if AGENT_SESSION_PATH.exists():
-        return AGENT_SESSION_PATH.read_text().strip()
-    sid = str(uuid.uuid4())
-    AGENT_SESSION_PATH.parent.mkdir(parents=True, exist_ok=True)
-    AGENT_SESSION_PATH.write_text(sid + "\n")
-    return sid
-
-
-def _run_claude_session(base_cmd, sid, text, cwd, env, timeout):
-    """Run claude in a dedicated session: resume it, else create it.
-
-    --resume fails on a session that doesn't exist yet; --session-id fails on
-    one that does. Try resume first (the steady state), fall back to create,
-    and handle the create/create race between two concurrent first requests.
-    """
-    def run(args):
-        return subprocess.run(
-            [*base_cmd, *args, text], cwd=cwd, env=env,
-            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout,
-        )
-
-    proc = run(["--resume", sid])
-    if proc.returncode == 0:
-        return proc
-    if "No conversation found" in (proc.stderr + proc.stdout):
-        proc = run(["--session-id", sid])
-        if proc.returncode != 0 and "already in use" in (proc.stderr + proc.stdout):
-            proc = run(["--resume", sid])  # lost the create race; resume instead
-    return proc
 
 
 def tailscale_ip() -> str | None:
@@ -108,37 +62,9 @@ def _to_wav(data: bytes) -> Path:
         src.unlink(missing_ok=True)
 
 
-def _speak_m4a(text: str) -> bytes:
-    """Render text to spoken audio (m4a) via macOS `say` + ffmpeg."""
-    aiff = Path(tempfile.mkstemp(suffix=".aiff")[1])
-    m4a = aiff.with_suffix(".m4a")
-    try:
-        subprocess.run(["say", "-o", str(aiff), text], check=True, timeout=120)
-        subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(aiff), str(m4a)],
-            check=True, timeout=60,
-        )
-        return m4a.read_bytes()
-    finally:
-        aiff.unlink(missing_ok=True)
-        m4a.unlink(missing_ok=True)
-
-
-def _agent_env() -> dict:
-    """Child env for the agent: drop vars a parent Claude session leaks in,
-    which make a nested `claude -p` fail to authenticate."""
-    env = dict(os.environ)
-    for var in list(env):
-        if var == "ANTHROPIC_BASE_URL" or var.startswith(("CLAUDE_CODE_", "CLAUDECODE")):
-            env.pop(var)
-    return env
-
-
 class _Handler(BaseHTTPRequestHandler):
     token: str = ""
     allow_paste: bool = False
-    agent_cmd: list[str] | None = None
-    agent_dir: str = "."
 
     def _reply(self, status: int, payload: dict) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode()
@@ -147,13 +73,6 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
-
-    def _reply_audio(self, data: bytes) -> None:
-        self.send_response(200)
-        self.send_header("Content-Type", "audio/mp4")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
 
     def _transcribe_body(self, use_llm: bool) -> tuple[str, str] | None:
         """Read the uploaded clip and run the pipeline. Replies on error."""
@@ -201,8 +120,6 @@ class _Handler(BaseHTTPRequestHandler):
 
         if url.path == "/dictate":
             self._dictate(flag("llm"), flag("paste"))
-        elif url.path == "/agent":
-            self._agent(flag("llm"), flag("continue"), flag("speak"), flag("reset"))
         elif url.path == "/learn":
             self._learn()
         else:
@@ -238,71 +155,20 @@ class _Handler(BaseHTTPRequestHandler):
             history.append(raw, text)
         self._reply(200, {"text": text, "raw": raw, "pasted": pasted})
 
-    def _agent(self, use_llm: bool, cont: bool, speak: bool, reset: bool) -> None:
-        if self.agent_cmd is None:
-            self._reply(403, {"error": "agent endpoint disabled (start with --agent)"})
-            return
-        result = self._transcribe_body(use_llm)
-        if result is None:
-            return
-        raw, text = result
-        if not text:
-            self._reply(400, {"error": "empty transcript"})
-            return
-
-        # Session continuity is claude-specific and always via a dedicated,
-        # isolated session — never `--continue` (which would hijack whatever
-        # interactive conversation is newest in the working directory).
-        is_claude = Path(self.agent_cmd[0]).name == "claude"
-        print(f"  agent ← {text}")
-        try:
-            if cont and is_claude:
-                sid = agent_session_id(reset=reset)
-                proc = _run_claude_session(
-                    self.agent_cmd, sid, text, self.agent_dir, _agent_env(), 600
-                )
-            else:
-                proc = subprocess.run(
-                    [*self.agent_cmd, text], cwd=self.agent_dir, env=_agent_env(),
-                    stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=600,
-                )
-        except subprocess.TimeoutExpired:
-            self._reply(504, {"error": "agent timed out after 600s"})
-            return
-        if proc.returncode != 0:
-            detail = (proc.stderr.strip() or proc.stdout.strip())[-300:]
-            self._reply(502, {"error": f"agent failed: {detail}"})
-            return
-        reply = proc.stdout.strip()
-        history.append(raw, text)
-
-        if speak and reply:
-            try:
-                self._reply_audio(_speak_m4a(reply))
-                return
-            except subprocess.SubprocessError:
-                pass  # fall back to JSON
-        self._reply(200, {"prompt": text, "reply": reply})
-
     def log_message(self, fmt, *args):  # quieter: one line per request
         print(f"  {self.client_address[0]} {fmt % args}")
 
 
-def serve(host: str | None, port: int, allow_paste: bool,
-          agent_cmd: list[str] | None = None, agent_dir: str = ".") -> None:
+def serve(host: str | None, port: int, allow_paste: bool) -> None:
     token = load_token()
     if host is None:
         host = tailscale_ip() or "127.0.0.1"
     _Handler.token = token
     _Handler.allow_paste = allow_paste
-    _Handler.agent_cmd = agent_cmd
-    _Handler.agent_dir = agent_dir
     server = ThreadingHTTPServer((host, port), _Handler)
     print(f"susurrate serve: listening on http://{host}:{port}/dictate")
     print(f"  token: {token}   (also in {TOKEN_PATH})")
     print(f"  paste into this machine's frontmost app: {'enabled' if allow_paste else 'disabled'}")
-    if agent_cmd:
-        print(f"  agent endpoint: /agent → {' '.join(agent_cmd)} (in {agent_dir})")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
