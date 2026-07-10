@@ -5,7 +5,7 @@ description = "Local, private Wispr Flow-style voice dictation for macOS"
 license = "MIT"
 readme = "README.md"
 authors = [
-    { name = "Jon Danzig", email = "jonathan.danzig@gmail.com" }
+    { name = "Jonathan Danzig", email = "jonathan.danzig@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [

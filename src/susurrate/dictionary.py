@@ -18,6 +18,16 @@ DICT_PATH = Path.home() / ".local/share/susurrate/dictionary.json"
 WORDS_PATH = Path("/usr/share/dict/words")
 _TOKEN = re.compile(r"[A-Za-z']+")
 
+# Baked in so a fresh install already knows its own name — whisper reliably
+# mishears "susurrate". Your saved corrections override these.
+DEFAULTS = {
+    "sesarite": "Susurrate",
+    "susurate": "Susurrate",
+    "sussurate": "Susurrate",
+    "sutterate": "Susurrate",
+    "susserate": "Susurrate",
+}
+
 
 @lru_cache(maxsize=1)
 def _real_words() -> frozenset[str]:
@@ -27,12 +37,16 @@ def _real_words() -> frozenset[str]:
         return frozenset()
 
 
-def load() -> dict[str, str]:
-    """Corrections as {lowercased wrong word: right form}."""
+def _load_file() -> dict[str, str]:
     try:
         return json.loads(DICT_PATH.read_text())
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def load() -> dict[str, str]:
+    """Active corrections: hardcoded DEFAULTS plus your saved edits (yours win)."""
+    return {**DEFAULTS, **_load_file()}
 
 
 def save(corrections: dict[str, str]) -> None:
@@ -86,7 +100,7 @@ def learn(original: str, edited: str) -> dict[str, str]:
             if _learnable(wrong, right):
                 learned[wrong.lower()] = right
     if learned:
-        corrections = load()
+        corrections = _load_file()  # persist only your edits, not the DEFAULTS
         corrections.update(learned)
         save(corrections)
     return learned

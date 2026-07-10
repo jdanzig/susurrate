@@ -34,6 +34,15 @@ class TestLearnGuard(unittest.TestCase):
         self.assertFalse(dictionary._learnable("hello", "hello"))
 
 
+class TestDefaults(unittest.TestCase):
+    def test_ships_knowing_its_name(self):
+        # a fresh install (no user file) already corrects the app's name
+        self.assertEqual(dictionary.DEFAULTS["sesarite"], "Susurrate")
+        merged = {**dictionary.DEFAULTS}
+        self.assertEqual(dictionary.apply("great tool called sesarite", merged),
+                         "great tool called Susurrate")
+
+
 class TestPrompt(unittest.TestCase):
     def test_prompt_lists_right_forms(self):
         self.assertEqual(dictionary.prompt({"sesarite": "susurrate"}), "susurrate")
