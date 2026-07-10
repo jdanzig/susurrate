@@ -149,28 +149,32 @@ It starts at login, restarts on crash, and logs to
 
 ## How it compares
 
-|  | [Wispr Flow](https://wisprflow.ai/) | [Superwhisper](https://superwhisper.com/) | **susurrate** |
-|---|---|---|---|
-| Price | ~$15/mo | subscription | **free** |
-| Source | closed | closed | **open (~1000 lines)** |
-| Transcription | their cloud | local *or* cloud | **local (whisper.cpp)** |
-| AI cleanup (fillers, punctuation, self-corrections) | yes | yes | **yes** |
-| Audio stays on your hardware | no | yes (local mode) | **always** |
-| Desktop hold-to-talk → paste at cursor | yes | yes | **yes** |
-| iPhone native keyboard (types into any app) | yes | yes | no — web app, copy-paste |
-| Personal dictionary | yes | yes | **yes (teach by editing)** |
-| Multi-language | 100+ | many | English (`base.en`, swappable) |
-| Command mode / per-app tone | yes | yes | no |
-| Setup & maintenance | none | none | you run a server |
-| Self-hosted, one brain for all your devices | no | no | **yes** |
+|  | [Wispr Flow](https://wisprflow.ai/) | [Superwhisper](https://superwhisper.com/) | [OpenSuperWhisper](https://github.com/starmel/OpenSuperWhisper) | **susurrate** |
+|---|---|---|---|---|
+| Price | ~$15/mo | subscription | free | **free** |
+| Source | closed | closed | open (Swift) | **open (~1000 lines Python)** |
+| Transcription | their cloud | local *or* cloud | local | **local (whisper.cpp)** |
+| AI cleanup (fillers, punctuation, self-corrections) | yes | yes | no — raw transcript | **yes** |
+| Audio stays on your hardware | no | yes (local mode) | yes | **always** |
+| Desktop hold-to-talk → paste at cursor | yes | yes | yes | **yes** |
+| iPhone native keyboard (types into any app) | yes | yes | no (macOS only) | no — web app, copy-paste |
+| Personal dictionary | yes | yes | autocorrect only | **yes (teach by editing)** |
+| Multi-language | 100+ | many | many (auto-detect) | English (`base.en`, swappable) |
+| Command mode / per-app tone | yes | yes | no | no |
+| Native app UI (menu bar, model manager) | yes | yes | yes | no — server + web app |
+| Setup & maintenance | none | none | download the app | you run a server |
+| Self-hosted, one brain for all your devices | no | no | no | **yes** |
 
-**The honest read:** on the desktop loop — hold a key, speak, clean text at
-your cursor — the three are equivalent, and susurrate is free, private, and
-yours to change. Where the paid apps still win: a **native iOS keyboard** (yours
-is a copy-paste web app on the phone), more languages and modes out of the box,
-and zero maintenance. susurrate is the right pick if you want to own the whole
-stack, pay nothing, and keep audio on hardware you control; the paid apps are
-easier if you'd rather it just work with no server to run.
+**The honest read:** the two paid apps (Wispr Flow, Superwhisper) and susurrate
+all do the same core trick — hold a key, speak, get *cleaned* text at your
+cursor. OpenSuperWhisper is the odd one out: free and open like susurrate, but
+it gives you the raw transcript with no cleanup pass, and it's macOS-only. So
+susurrate's niche is "the AI-cleanup dictation experience, but free, open, and
+self-hosted." Where the paid apps still win: a **native iOS keyboard** (yours is
+a copy-paste web app on the phone), more languages and modes out of the box, and
+zero maintenance. Pick susurrate to own the whole stack, pay nothing, and keep
+audio on hardware you control; pick a paid app if you'd rather it just work with
+no server to run.
 
 Susurrate is deliberately small: under 1000 lines of Python, meant as a
 hackable base for experimenting with the transcript→clean-text stage.
