@@ -149,24 +149,31 @@ It starts at login, restarts on crash, and logs to
 
 ## How it compares
 
-**vs [Wispr Flow](https://wisprflow.ai/):** same core loop (hotkey → speak →
-polished text at cursor), but 100% local and free. Not (yet) included:
-command mode, per-app tone, menu-bar UI, streaming transcription. See
-[PLAN.md](PLAN.md).
+|  | [Wispr Flow](https://wisprflow.ai/) | [Superwhisper](https://superwhisper.com/) | **susurrate** |
+|---|---|---|---|
+| Price | ~$15/mo | subscription | **free** |
+| Source | closed | closed | **open (~1000 lines)** |
+| Transcription | their cloud | local *or* cloud | **local (whisper.cpp)** |
+| AI cleanup (fillers, punctuation, self-corrections) | yes | yes | **yes** |
+| Audio stays on your hardware | no | yes (local mode) | **always** |
+| Desktop hold-to-talk → paste at cursor | yes | yes | **yes** |
+| iPhone native keyboard (types into any app) | yes | yes | no — web app, copy-paste |
+| Personal dictionary | yes | yes | **yes (teach by editing)** |
+| Multi-language | 100+ | many | English (`base.en`, swappable) |
+| Command mode / per-app tone | yes | yes | no |
+| Setup & maintenance | none | none | you run a server |
+| Self-hosted, one brain for all your devices | no | no | **yes** |
 
-**vs [OpenSuperWhisper](https://github.com/starmel/OpenSuperWhisper):** if you
-want a polished native dictation app, use that — it has a real UI, in-app
-model management, multilingual auto-detection, and a mic picker. What it
-doesn't have is the part that makes Wispr Flow feel different from plain
-dictation: a formatting pass between transcript and paste. Susurrate strips
-fillers and false starts, fixes punctuation, and can apply spoken
-self-corrections ("Tuesday — no wait, Wednesday" → "Wednesday") through a
-local LLM via [Ollama](https://ollama.com). [Superwhisper](https://superwhisper.com/)
-has a similar AI layer, but it's closed-source and paid.
+**The honest read:** on the desktop loop — hold a key, speak, clean text at
+your cursor — the three are equivalent, and susurrate is free, private, and
+yours to change. Where the paid apps still win: a **native iOS keyboard** (yours
+is a copy-paste web app on the phone), more languages and modes out of the box,
+and zero maintenance. susurrate is the right pick if you want to own the whole
+stack, pay nothing, and keep audio on hardware you control; the paid apps are
+easier if you'd rather it just work with no server to run.
 
-Susurrate is deliberately small: under 1000 lines of Python across eight
-modules, meant as a hackable base for experimenting with the
-transcript→clean-text stage (prompts, models, rules).
+Susurrate is deliberately small: under 1000 lines of Python, meant as a
+hackable base for experimenting with the transcript→clean-text stage.
 
 ## Development
 
