@@ -5,13 +5,6 @@ anywhere, speak, release — cleaned-up text is inserted at your cursor.
 Everything runs on-device: whisper.cpp for speech-to-text, optional Ollama
 for AI polish. No cloud, no accounts.
 
-<p align="center">
-  <img src="docs/dictate.png" width="330" alt="The phone web app: spoken 'um, can you send over the quarterly numbers before Thursday — no wait, before Wednesday — and, uh, loop in Sarah as well' came out as clean text with the correction applied">
-</p>
-
-<p align="center"><sub>The phone web app, real output: the "um"s stripped and a
-mid-sentence correction applied ("before Thursday — no wait, before Wednesday").</sub></p>
-
 ## Why not just use the built-in dictation?
 
 - **The polish.** Built-in dictation gives you the messy first pass, filler
