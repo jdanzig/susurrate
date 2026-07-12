@@ -1,10 +1,17 @@
 """Local speech-to-text via whisper.cpp's whisper-cli."""
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
 
-DEFAULT_MODEL = Path.home() / ".local/share/susurrate/models/ggml-base.en.bin"
+_MODEL_DIR = Path.home() / ".local/share/susurrate/models"
+# Swap the model (and language) without code changes: point SUSURRATE_MODEL at
+# a multilingual model (e.g. ggml-small.bin) and dictation goes multilingual.
+DEFAULT_MODEL = Path(os.environ.get("SUSURRATE_MODEL", _MODEL_DIR / "ggml-base.en.bin"))
+# 'auto' lets a multilingual model detect the spoken language per clip; it's a
+# harmless no-op for English-only .en models.
+LANGUAGE = os.environ.get("SUSURRATE_LANG", "auto")
 
 
 class TranscribeError(RuntimeError):
@@ -29,6 +36,7 @@ def transcribe(wav_path: str | Path, model: str | Path = DEFAULT_MODEL,
             "whisper-cli",
             "-m", str(model),
             "-f", str(wav_path),
+            "-l", LANGUAGE,
             "--no-timestamps",
             "--no-prints",
             *(["--prompt", initial_prompt] if initial_prompt else []),
