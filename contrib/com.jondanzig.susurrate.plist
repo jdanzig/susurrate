@@ -21,6 +21,8 @@
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/botclankman/.local/bin</string>
+        <key>SUSURRATE_MODEL</key>
+        <string>/Users/botclankman/.local/share/susurrate/models/ggml-small.bin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
