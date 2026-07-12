@@ -23,9 +23,21 @@ ffmpeg -y -loglevel error -i "$TMP/c.aiff" -c:a aac -b:a 48k "$TMP/c.m4a"
 # median of an array of seconds (bash + awk)
 median() { printf '%s\n' "$@" | sort -n | awk '{a[NR]=$1} END{print (NR%2)? a[(NR+1)/2] : (a[NR/2]+a[NR/2+1])/2}'; }
 
+command -v whisper-cli >/dev/null || { echo "ERROR: whisper-cli not found (brew install whisper-cpp)"; exit 1; }
+[ -f "$MODEL" ] || { echo "ERROR: model not found: $MODEL"; exit 1; }
+
 echo "model: $MODEL"
 echo "remote: $REMOTE"
 echo "runs: $RUNS  (first run of each is a warm-up, excluded)"
+echo
+
+# Sanity: prove both sides actually transcribe before we trust any timings.
+echo "== SANITY (must show real text on both) =="
+loc=$(whisper-cli -m "$MODEL" -f "$TMP/c.wav" -l auto --no-timestamps --no-prints 2>/dev/null | tr -d '\n' | sed 's/^ *//')
+rem=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" --data-binary @"$TMP/c.m4a" "$REMOTE/dictate" | sed 's/.*"raw": *"//; s/".*//')
+echo "  local : ${loc:-<EMPTY — local transcription failed>}"
+echo "  remote: ${rem:-<EMPTY — remote transcription failed>}"
+[ -z "$loc" ] && { echo "ERROR: local produced no text; not timing a broken run."; exit 1; }
 echo
 
 # --- LOCAL: this machine's whisper-cli, wall-clock per run ---
