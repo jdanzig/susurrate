@@ -8,8 +8,10 @@ for AI polish. No cloud, no accounts.
 ## Why not just use the built-in dictation?
 
 - **The polish.** Built-in dictation gives you the messy first pass, filler
-  words and all. susurrate strips the "um"s, fixes punctuation, and applies
-  spoken self-corrections — text you can send without editing.
+  words and all. susurrate strips the "um"s and fixes punctuation and
+  capitalization — text you can send without editing. (Turn on the optional
+  local-LLM pass with `--llm` and it also resolves spoken self-corrections like
+  "Tuesday — no wait, Wednesday.")
 - **Your voice never leaves hardware you own.** Speech is transcribed on your
   Mac by whisper.cpp. Nothing uploaded, no account, no logging you don't control.
   (Wispr Flow, the paid tool this clones, sends your audio to its servers.)
@@ -27,13 +29,31 @@ brew install whisper-cpp ffmpeg     # speech-to-text + audio decoding
 git clone https://github.com/jdanzig/susurrate && cd susurrate
 uv sync
 
-# download the speech model (~141 MB, one-time)
+# download the speech model (~141 MB, one-time) — English, small and fast
 mkdir -p ~/.local/share/susurrate/models
 curl -L -o ~/.local/share/susurrate/models/ggml-base.en.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
 ```
 
 (ffmpeg is only needed for remote mode, to decode uploaded m4a clips.)
+
+### Bigger models & other languages
+
+`base.en` is the fast English default. Point `SUSURRATE_MODEL` at a different
+whisper.cpp model to swap it — no code change:
+
+```sh
+# multilingual: handles English, Spanish, and ~99 more, auto-detected per clip
+curl -L -o ~/.local/share/susurrate/models/ggml-small.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+export SUSURRATE_MODEL=~/.local/share/susurrate/models/ggml-small.bin
+```
+
+Bigger models (`small` ≈ 465 MB, `medium` ≈ 1.5 GB, `large-v3-turbo` ≈ 1.6 GB)
+are more accurate — and the non-`.en` ones are multilingual — but slower. The
+language is auto-detected by default (`SUSURRATE_LANG=auto`); set it to a fixed
+code like `es` to skip detection. On Apple Silicon, `small` transcribes a few
+seconds of speech in ~1s.
 
 ## macOS permissions
 
@@ -82,11 +102,28 @@ polish pass, `paste=1` to paste the result into the *server's* frontmost app
 (off unless started with `--allow-paste`). Uploaded audio is deleted after
 transcription, same as local recordings.
 
-**From another Mac** — same hotkey experience, no models needed locally:
+**From another Mac** — same hotkey experience, transcription done by the server:
 
 ```sh
+SUSURRATE_TOKEN=<token> uv run susurrate --remote https://<machine>.<tailnet>.ts.net run
+# or straight to the server's plain-HTTP port, no tailscale serve needed:
 SUSURRATE_TOKEN=<token> uv run susurrate --remote http://100.x.y.z:8737 run
 ```
+
+**Falls back to local automatically.** If the server can't be reached (no
+internet, tailnet down, server asleep), `--remote` transcribes on the *local*
+machine instead — provided a local model is installed. It fails over fast: a
+short connect timeout (~4s) means a flaky connection drops you to local quickly
+rather than hanging, while a long read timeout lets a reachable-but-busy server
+finish transcribing. So keep a local model on the client if you want offline to
+work.
+
+**Which is faster, local or remote?** Depends on the hardware. Transcription
+runs on whichever machine does it, so if your always-on server has a faster chip
+than your laptop, remote (server does the work) can beat local despite the
+network hop — especially with a bigger model. `contrib/benchmark.sh` times both,
+same clip and model, so you can measure it on your own machines instead of
+guessing.
 
 **From a phone** — susurrate serves its own one-button web app at `GET /`.
 Phones only allow microphone access over HTTPS, so put Tailscale's built-in
@@ -159,7 +196,7 @@ It starts at login, restarts on crash, and logs to
 | Desktop hold-to-talk → paste at cursor | yes | yes | yes | **yes** |
 | iPhone native keyboard (types into any app) | yes | yes | no (macOS only) | no — web app, copy-paste |
 | Personal dictionary | yes | yes | autocorrect only | **yes (teach by editing)** |
-| Multi-language | 100+ | many | many (auto-detect) | English (`base.en`, swappable) |
+| Multi-language | 100+ | many | many (auto-detect) | **~99, auto-detect** (swap to a multilingual model) |
 | Command mode / per-app tone | yes | yes | no | no |
 | Native app UI (menu bar, model manager) | yes | yes | yes | no — server + web app |
 | Setup & maintenance | none | none | download the app | you run a server |

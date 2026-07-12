@@ -43,9 +43,14 @@ def dictate(wav_path: str | Path, url: str, token: str,
     """
     parsed = urlparse(url.rstrip("/"))
     body = Path(wav_path).read_bytes()
-    conn = http.client.HTTPSConnection(
-        parsed.hostname, parsed.port or 443, timeout=CONNECT_TIMEOUT
-    )
+    if parsed.scheme == "https":
+        conn = http.client.HTTPSConnection(
+            parsed.hostname, parsed.port or 443, timeout=CONNECT_TIMEOUT
+        )
+    else:
+        conn = http.client.HTTPConnection(
+            parsed.hostname, parsed.port or 8737, timeout=CONNECT_TIMEOUT
+        )
     try:
         conn.connect()  # TCP + TLS, bounded by CONNECT_TIMEOUT
         conn.sock.settimeout(READ_TIMEOUT)  # patient once we're through
