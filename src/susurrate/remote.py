@@ -1,12 +1,18 @@
 """Client for a remote `susurrate serve` instance."""
 
+import http.client
 import json
 import os
-import urllib.error
-import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
 from .server import TOKEN_PATH
+
+# Split timeouts: bail fast if we can't *reach* the server (sketchy internet →
+# fall back to local), but wait patiently once connected (the server may be
+# mid-transcription — legit silence, not a network problem).
+CONNECT_TIMEOUT = 4.0
+READ_TIMEOUT = 60.0
 
 
 class RemoteError(RuntimeError):
@@ -28,26 +34,38 @@ def resolve_token(explicit: str | None) -> str:
 
 
 def dictate(wav_path: str | Path, url: str, token: str,
-            use_llm: bool = False, timeout: float = 120.0) -> tuple[str, str]:
-    """POST a WAV to the server; return (raw transcript, cleaned text)."""
-    endpoint = f"{url.rstrip('/')}/dictate?llm={int(use_llm)}"
-    req = urllib.request.Request(
-        endpoint,
-        data=Path(wav_path).read_bytes(),
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "audio/wav",
-        },
+            use_llm: bool = False) -> tuple[str, str]:
+    """POST a WAV to the server; return (raw transcript, cleaned text).
+
+    Uses a short connect timeout (reach the server fast, else give up so the
+    caller can fall back to local) and a long read timeout (let the server
+    finish transcribing).
+    """
+    parsed = urlparse(url.rstrip("/"))
+    body = Path(wav_path).read_bytes()
+    conn = http.client.HTTPSConnection(
+        parsed.hostname, parsed.port or 443, timeout=CONNECT_TIMEOUT
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            payload = json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        try:
-            detail = json.loads(e.read()).get("error", "")
-        except Exception:
-            detail = ""
-        raise RemoteError(f"server returned {e.code}: {detail}") from e
-    except (urllib.error.URLError, TimeoutError) as e:
+        conn.connect()  # TCP + TLS, bounded by CONNECT_TIMEOUT
+        conn.sock.settimeout(READ_TIMEOUT)  # patient once we're through
+        conn.request(
+            "POST", f"{parsed.path}/dictate?llm={int(use_llm)}", body=body,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "audio/wav"},
+        )
+        resp = conn.getresponse()
+        raw = resp.read()
+    except (OSError, http.client.HTTPException) as e:
         raise RemoteError(f"cannot reach {url}: {e}") from e
+    finally:
+        conn.close()
+
+    if resp.status != 200:
+        detail = ""
+        try:
+            detail = json.loads(raw).get("error", "")
+        except Exception:
+            pass
+        raise RemoteError(f"server returned {resp.status}: {detail}")
+    payload = json.loads(raw)
     return payload.get("raw", ""), payload.get("text", "")
