@@ -10,12 +10,18 @@ like a mistranscription or a proper noun whisper hasn't seen.
 
 import difflib
 import json
+import os
 import re
 from functools import lru_cache
 from pathlib import Path
 
 DICT_PATH = Path.home() / ".local/share/susurrate/dictionary.json"
-WORDS_PATH = Path("/usr/share/dict/words")
+# macOS/Linux ship a word list; Windows doesn't, so we also look next to the
+# dictionary (put any one-word-per-line file there, e.g. dwyl/english-words).
+WORDS_PATHS = (
+    Path(os.environ.get("SUSURRATE_WORDS", "/usr/share/dict/words")),
+    DICT_PATH.parent / "words",
+)
 _TOKEN = re.compile(r"[A-Za-z']+")
 
 # Baked in so a fresh install already knows its own name — whisper reliably
@@ -31,10 +37,12 @@ DEFAULTS = {
 
 @lru_cache(maxsize=1)
 def _real_words() -> frozenset[str]:
-    try:
-        return frozenset(w.strip().lower() for w in WORDS_PATH.read_text().splitlines())
-    except OSError:
-        return frozenset()
+    for path in WORDS_PATHS:
+        try:
+            return frozenset(w.strip().lower() for w in path.read_text().splitlines())
+        except OSError:
+            continue
+    return frozenset()
 
 
 def _load_file() -> dict[str, str]:
