@@ -93,6 +93,14 @@ Run the pipeline on an always-on machine (say, a Mac mini on your
 uv run susurrate serve    # on the always-on machine
 ```
 
+**Set it up once, use it on every machine you own.** The server is the only
+place a model lives. Every other machine — laptop, spare, burner — runs a thin
+client that just records and pastes, so adding one is a `git clone` and a token:
+no model download, no per-machine setup, nothing to keep in step. They all share
+**one model and one dictionary** — teach it a word on any machine and every
+machine knows it, because the correction lives on the server. Free, however many
+machines you have.
+
 The server binds to your Tailscale IP by default (falling back to
 127.0.0.1) and generates a bearer token on first run — it prints both, and
 the token lives in `~/.local/share/susurrate/token`. One endpoint:
@@ -200,7 +208,8 @@ It starts at login, restarts on crash, and logs to
 | Command mode / per-app tone | yes | yes | no | no |
 | Native app UI (menu bar, model manager) | yes | yes | yes | no — server + web app |
 | Setup & maintenance | none | none | download the app | you run a server |
-| Self-hosted, one brain for all your devices | no | no | no | **yes** |
+| Adding another machine | install + sign in | install + sign in | full install, own models & dictionary | **thin client — no model, shares the server's dictionary** |
+| Self-hosted, one brain for all your devices | no (their cloud) | no | no (per-machine) | **yes** |
 
 **The honest read:** the two paid apps (Wispr Flow, Superwhisper) and susurrate
 all do the same core trick — hold a key, speak, get *cleaned* text at your
