@@ -12,6 +12,9 @@ DEFAULT_MODEL = Path(os.environ.get("SUSURRATE_MODEL", _MODEL_DIR / "ggml-base.e
 # 'auto' lets a multilingual model detect the spoken language per clip; it's a
 # harmless no-op for English-only .en models.
 LANGUAGE = os.environ.get("SUSURRATE_LANG", "auto")
+# Name on PATH, or a full path to the binary (needed on Windows, where the
+# whisper.cpp release zip is unpacked to a folder rather than installed).
+WHISPER_CLI = os.environ.get("SUSURRATE_WHISPER_CLI", "whisper-cli")
 
 
 class TranscribeError(RuntimeError):
@@ -25,15 +28,18 @@ def transcribe(wav_path: str | Path, model: str | Path = DEFAULT_MODEL,
     initial_prompt biases recognition toward your vocabulary (proper nouns,
     jargon) — see the personal dictionary.
     """
-    if shutil.which("whisper-cli") is None:
-        raise TranscribeError("whisper-cli not found (brew install whisper-cpp)")
+    if shutil.which(WHISPER_CLI) is None:
+        raise TranscribeError(
+            "whisper-cli not found (brew install whisper-cpp, or point "
+            "SUSURRATE_WHISPER_CLI at the binary)"
+        )
     model = Path(model)
     if not model.exists():
         raise TranscribeError(f"whisper model not found: {model}")
 
     result = subprocess.run(
         [
-            "whisper-cli",
+            WHISPER_CLI,
             "-m", str(model),
             "-f", str(wav_path),
             "-l", LANGUAGE,

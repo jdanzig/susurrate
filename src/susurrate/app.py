@@ -147,7 +147,9 @@ def main() -> int:
     sp.set_defaults(func=cmd_once)
 
     sp = sub.add_parser("run", help="daemon: global hold-to-talk dictation")
-    sp.add_argument("--key", choices=["alt_r", "alt_l", "cmd_r", "ctrl_r", "f13", "f14", "f15"])
+    sp.add_argument("--key", metavar="KEY",
+                    help="hotkey, or a '+' chord of alt_r, alt_l, cmd_r, ctrl_r, "
+                         "ctrl, win, f13-f15 (default: ctrl+win)")
     sp.set_defaults(func=cmd_run)
 
     sp = sub.add_parser("serve", help="HTTP dictation server (POST /dictate)")
