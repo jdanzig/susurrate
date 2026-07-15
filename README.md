@@ -101,6 +101,10 @@ no model download, no per-machine setup, nothing to keep in step. They all share
 machine knows it, because the correction lives on the server. Free, however many
 machines you have.
 
+**There is no account and no sign-in.** Auth is a static bearer token you set
+once per machine — it never expires, and using one machine never logs out
+another. Nothing to re-authenticate, on any machine, ever.
+
 The server binds to your Tailscale IP by default (falling back to
 127.0.0.1) and generates a bearer token on first run — it prints both, and
 the token lives in `~/.local/share/susurrate/token`. One endpoint:
@@ -209,6 +213,7 @@ It starts at login, restarts on crash, and logs to
 | Native app UI (menu bar, model manager) | yes | yes | yes | no — server + web app |
 | Setup & maintenance | none | none | download the app | you run a server |
 | Adding another machine | install + sign in | install + sign in | full install, own models & dictionary | **thin client — no model, shares the server's dictionary** |
+| Account / sign-in | required | required | none | **none — a static token, never expires** |
 | Self-hosted, one brain for all your devices | no (their cloud) | no | no (per-machine) | **yes** |
 
 **The honest read:** the two paid apps (Wispr Flow, Superwhisper) and susurrate
