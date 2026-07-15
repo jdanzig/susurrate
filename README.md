@@ -1,9 +1,15 @@
 # susurrate
 
-Local, private Wispr Flow-style voice dictation for macOS. Hold a hotkey
-anywhere, speak, release — cleaned-up text is inserted at your cursor.
+Local, private Wispr Flow-style voice dictation for **macOS and Windows**. Hold a
+hotkey anywhere, speak, release — cleaned-up text is inserted at your cursor.
 Everything runs on-device: whisper.cpp for speech-to-text, optional Ollama
 for AI polish. No cloud, no accounts.
+
+> **Credit.** susurrate was created by **[Jonathan Danzig (`jdanzig`)](https://github.com/jdanzig/susurrate)**,
+> who designed and built the original tool — the architecture, the
+> transcript-cleanup pipeline, and the remote/web-app modes are all his work.
+> This repository is a fork that adds **Windows support** on top of it. On a Mac,
+> you can use either this repo or [the upstream original](https://github.com/jdanzig/susurrate).
 
 ## Why not just use the built-in dictation?
 
@@ -13,12 +19,45 @@ for AI polish. No cloud, no accounts.
   local-LLM pass with `--llm` and it also resolves spoken self-corrections like
   "Tuesday — no wait, Wednesday.")
 - **Your voice never leaves hardware you own.** Speech is transcribed on your
-  Mac by whisper.cpp. Nothing uploaded, no account, no logging you don't control.
+  own machine by whisper.cpp. Nothing uploaded, no account, no logging you don't control.
   (Wispr Flow, the paid tool this clones, sends your audio to its servers.)
 - **It's yours.** A token-guarded HTTP endpoint any script, hotkey, or Shortcut
   can call, plus a personal dictionary you teach. Free, ~1000 lines of Python.
 
-## Setup
+## Setup (Windows)
+
+The Windows port needs no special permissions — none of the macOS Input
+Monitoring / Accessibility grants. Full details are in
+[WINDOWS.md](WINDOWS.md); the short version:
+
+1. Get the code: **Code → Download ZIP** above (or `git clone`), and unzip to
+   `C:\Users\<you>\Tools\susurrate`. Keep it **out of OneDrive** — Python
+   virtualenvs and file sync don't mix.
+2. Open PowerShell in that folder and run the one-shot installer:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
+   ```
+
+   It installs [uv](https://docs.astral.sh/uv/) (via winget), downloads the
+   whisper.cpp Windows binaries and the `ggml-base.en.bin` model, installs a
+   wordlist, sets the `SUSURRATE_WHISPER_CLI` environment variable, runs
+   `uv sync`, and runs the tests. It's idempotent — safe to re-run.
+3. Open a **new** terminal (to pick up the env var) and try it:
+
+   ```powershell
+   uv run susurrate once --seconds 5   # speak; the transcript prints
+   uv run susurrate run                # daemon: hold Ctrl+Win to dictate
+   ```
+
+To start susurrate automatically at logon, run
+`powershell -ExecutionPolicy Bypass -File .\contrib\install-daemon-windows.ps1`
+once. Everything below — remote mode, the phone web app, the personal
+dictionary, `--llm` polish — works the same on Windows; see
+[WINDOWS.md](WINDOWS.md) for the handful of platform specifics (default hotkey
+is **Ctrl+Win**, ffmpeg via `winget install Gyan.FFmpeg`, Ollama for Windows).
+
+## Setup (macOS)
 
 Requirements: macOS, [Homebrew](https://brew.sh), [uv](https://docs.astral.sh/uv/).
 Optional: [Ollama](https://ollama.com) with `llama3.2:3b` for the `--llm`
@@ -171,8 +210,10 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
   --data-binary @clip.m4a "https://<machine>.<tailnet>.ts.net/dictate?llm=1"
 ```
 
-## Run it as a service (launchd)
+## Run it as a service (macOS, launchd)
 
+On Windows, use `contrib/install-daemon-windows.ps1` instead (see
+[WINDOWS.md](WINDOWS.md)). On macOS,
 `contrib/com.jondanzig.susurrate.plist` is a template LaunchAgent (edit the
 paths/username). Install with:
 
@@ -221,3 +262,12 @@ hackable base for experimenting with the transcript→clean-text stage.
 ```sh
 uv run python -m unittest discover -s tests
 ```
+
+## Credits
+
+susurrate was designed and built by **[Jonathan Danzig](https://github.com/jdanzig)**
+([`jdanzig/susurrate`](https://github.com/jdanzig/susurrate)) — the architecture,
+the transcript-cleanup pipeline, and the remote and web-app modes are all his.
+This fork adds only the Windows port: clipboard-paste injection, `+`-chord
+hotkeys, a whisper.cpp-CLI path, a wordlist fallback, and a Task Scheduler logon
+daemon (see [WINDOWS.md](WINDOWS.md)). Licensed MIT, © 2026 Jonathan Danzig.
