@@ -137,6 +137,23 @@ network hop — especially with a bigger model. `contrib/benchmark.sh` times bot
 same clip and model, so you can measure it on your own machines instead of
 guessing.
 
+**Faster: keep the model resident.** By default each clip spawns `whisper-cli`,
+which reloads the model from disk — ~0.5s of fixed overhead per dictation, most
+of the wait on a short clip. whisper.cpp ships a `whisper-server` that loads the
+model once and keeps it in memory. Run it and point susurrate at it:
+
+```sh
+whisper-server -m ~/.local/share/susurrate/models/ggml-small.bin \
+  --host 127.0.0.1 --port 8181 --no-timestamps &
+export SUSURRATE_WHISPER_SERVER=http://127.0.0.1:8181
+```
+
+Now `serve` (or a local `run`) sends clips to the resident server instead of
+reloading the model — roughly halving latency on short dictations, no accuracy
+change. `contrib/com.jondanzig.whisper-server.plist` is a launchd template to
+keep it running. Leave `SUSURRATE_WHISPER_SERVER` unset and it falls back to
+spawning `whisper-cli` per clip (needed on clients with no server).
+
 **From a phone** — susurrate serves its own one-button web app at `GET /`.
 Phones only allow microphone access over HTTPS, so put Tailscale's built-in
 HTTPS proxy in front:

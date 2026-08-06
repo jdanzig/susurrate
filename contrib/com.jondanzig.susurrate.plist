@@ -12,8 +12,6 @@
         <string>/Users/botclankman/code/susurrate</string>
         <string>susurrate</string>
         <string>serve</string>
-        <string>--host</string>
-        <string>127.0.0.1</string>
     </array>
     <key>WorkingDirectory</key>
     <string>/Users/botclankman/code/susurrate</string>
@@ -23,6 +21,8 @@
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/botclankman/.local/bin</string>
         <key>SUSURRATE_MODEL</key>
         <string>/Users/botclankman/.local/share/susurrate/models/ggml-small.bin</string>
+        <key>SUSURRATE_WHISPER_SERVER</key>
+        <string>http://127.0.0.1:8181</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
