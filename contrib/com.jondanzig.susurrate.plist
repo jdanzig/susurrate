@@ -12,6 +12,8 @@
         <string>/Users/botclankman/code/susurrate</string>
         <string>susurrate</string>
         <string>serve</string>
+        <string>--host</string>
+        <string>0.0.0.0</string>
     </array>
     <key>WorkingDirectory</key>
     <string>/Users/botclankman/code/susurrate</string>
