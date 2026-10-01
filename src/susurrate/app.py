@@ -74,22 +74,41 @@ def cmd_run(args) -> int:
     from .hotkey import DEFAULT_KEY, listen
 
     rec = Recorder()
+    timer: threading.Timer | None = None
+    # Safety net: if a release event is lost (macOS can drop it after waking
+    # from sleep), recording would never stop. Force-stop after this long —
+    # longer than any real dictation, short enough that it self-heals fast.
+    MAX_RECORDING_SECONDS = 120
+
+    def finish():
+        nonlocal timer
+        if timer is not None:
+            timer.cancel()
+            timer = None
+        wav = rec.stop()  # idempotent: returns None if already stopped
+        if wav is None:
+            print("  (too short, ignored)", file=sys.stderr)
+            return
+        # Process off the listener thread so the hotkey stays responsive.
+        threading.Thread(target=_handle, args=(wav,), daemon=True).start()
 
     def on_press():
+        nonlocal timer
         try:
             rec.start()
         except NoMicrophoneError as e:
             print(f"error: {e}", file=sys.stderr)
             return
         print("● recording…", file=sys.stderr)
+        timer = threading.Timer(MAX_RECORDING_SECONDS, _timed_out)
+        timer.start()
+
+    def _timed_out():
+        print(f"  (max {MAX_RECORDING_SECONDS}s reached — auto-stopped)", file=sys.stderr)
+        finish()
 
     def on_release():
-        wav = rec.stop()
-        if wav is None:
-            print("  (too short, ignored)", file=sys.stderr)
-            return
-        # Process off the listener thread so the hotkey stays responsive.
-        threading.Thread(target=_handle, args=(wav,), daemon=True).start()
+        finish()
 
     def _handle(wav):
         try:
