@@ -78,7 +78,7 @@ def cmd_run(args) -> int:
     # Safety net: if a release event is lost (macOS can drop it after waking
     # from sleep), recording would never stop. Force-stop after this long —
     # longer than any real dictation, short enough that it self-heals fast.
-    MAX_RECORDING_SECONDS = 120
+    MAX_RECORDING_SECONDS = 300
 
     def finish():
         nonlocal timer
