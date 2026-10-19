@@ -133,10 +133,21 @@ def cmd_run(args) -> int:
         f"susurrate: hold [{key}] to dictate, release to insert. Ctrl-C to quit.",
         file=sys.stderr,
     )
-    listen(on_press, on_release, key)
+    listener = listen(on_press, on_release, key)
+    # macOS disables the global key tap across sleep/wake and pynput doesn't
+    # re-enable it, leaving the daemon alive but deaf until restarted. A sleep
+    # makes the wall clock jump, so a 2s loop that took far longer means we
+    # just woke — recreate the listener to get a fresh, working tap.
+    last = time.time()
     try:
         while True:
-            time.sleep(1)
+            time.sleep(2)
+            now = time.time()
+            if now - last > 10:
+                listener.stop()
+                listener = listen(on_press, on_release, key)
+                print("  (woke from sleep — listener restarted)", file=sys.stderr)
+            last = now
     except KeyboardInterrupt:
         return 0
 
